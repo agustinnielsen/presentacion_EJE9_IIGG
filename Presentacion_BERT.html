@@ -1,0 +1,2292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Análisis comparativo de modelos RoBERTa — Agustín Nielsen (IIGG-UBA)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       AGUSTÍN NIELSEN — SISTEMA HÍBRIDO ACADÉMICO-MONOCROMO (PRESENTACIÓN 16:9)
+       ========================================================================== */
+    :root {
+      --bg: #ffffff;
+      --fg: #000000;
+      --fg-muted: #555555;
+      --bg-muted: #f6f6f6;
+      --font-sans: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+      --font-mono: 'Courier Prime', 'Courier New', Courier, monospace;
+      --border-thin: 1px solid var(--fg);
+      --border-thick: 2px solid var(--fg);
+      --border-dashed: 1px dashed var(--fg);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background-color: #eaeaea;
+      color: var(--fg);
+      font-family: var(--font-sans);
+      overflow: hidden;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Contenedor general que centra el lienzo 16:9 */
+    .deck-viewport {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--bg);
+      position: relative;
+    }
+
+    /* Lienzo de diapositiva 16:9 escalable */
+    .deck-stage {
+      width: 1600px;
+      height: 900px;
+      background-color: var(--bg);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border: var(--border-thin);
+      transform-origin: center center;
+    }
+
+    /* En pantalla completa eliminamos borde exterior */
+    :fullscreen .deck-stage {
+      border: none;
+    }
+
+    /* Barra de progreso superior */
+    .progress-track {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: transparent;
+      z-index: 30;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--fg);
+      width: 10%;
+      transition: width 0.25s ease;
+    }
+
+    /* Header minimalista de diapositiva */
+    .slide-topbar {
+      height: 64px;
+      padding: 0 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: var(--border-dashed);
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      letter-spacing: 0.5px;
+      color: var(--fg-muted);
+      z-index: 20;
+      flex-shrink: 0;
+    }
+
+    .slide-topbar .section-tag {
+      color: var(--fg);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .slide-topbar .context-tag {
+      font-size: 0.85rem;
+    }
+
+    /* Área de diapositivas */
+    .slides-wrapper {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      overflow: hidden;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 56px 80px;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.18s ease;
+    }
+
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Footer de navegación y controles estilo terminal */
+    .slide-bottombar {
+      height: 60px;
+      padding: 0 64px;
+      border-top: var(--border-thin);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      background-color: var(--bg);
+      z-index: 20;
+      flex-shrink: 0;
+    }
+
+    .nav-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mono-btn {
+      background: var(--bg);
+      color: var(--fg);
+      border: var(--border-thin);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      padding: 6px 14px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+
+    .mono-btn:hover {
+      background: var(--fg);
+      color: var(--bg);
+    }
+
+    .mono-btn:disabled {
+      opacity: 0.35;
+      pointer-events: none;
+    }
+
+    .slide-counter {
+      font-weight: 700;
+      min-width: 110px;
+      text-align: center;
+    }
+
+    /* ==========================================================================
+       TIPOGRAFÍA Y COMPONENTES INTERNOS DE DIAPOSITIVAS
+       ========================================================================== */
+
+    /* SLIDE 1: PORTADA */
+    .cover-layout {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px 0;
+    }
+
+    .cover-kicker {
+      font-family: var(--font-mono);
+      font-size: 1.05rem;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      border-left: 3px solid var(--fg);
+      padding-left: 16px;
+      color: var(--fg-muted);
+    }
+
+    .cover-title {
+      font-size: 3.1rem;
+      line-height: 1.28;
+      font-weight: 300;
+      max-width: 1320px;
+      letter-spacing: -0.02em;
+    }
+
+    .cover-title strong {
+      font-weight: 700;
+    }
+
+    .cover-footer {
+      border-top: var(--border-thick);
+      padding-top: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .cover-author-name {
+      font-size: 1.55rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .cover-author-role {
+      font-size: 1.15rem;
+      color: var(--fg-muted);
+      font-weight: 400;
+    }
+
+    .cover-meta-box {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      border: var(--border-thin);
+      padding: 12px 20px;
+      background: var(--bg-muted);
+      text-align: right;
+    }
+
+    /* ENCABEZADOS Y LISTAS GENERALES */
+    .slide-heading {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: var(--border-thick);
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+
+    .slide-heading .sub-mono {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 400;
+      color: var(--fg-muted);
+    }
+
+    .clean-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 6px;
+    }
+
+    .clean-list li {
+      font-size: 1.35rem;
+      line-height: 1.45;
+      padding-left: 26px;
+      position: relative;
+    }
+
+    .clean-list li::before {
+      content: "–";
+      position: absolute;
+      left: 0;
+      font-family: var(--font-mono);
+      font-weight: 700;
+    }
+
+    /* SLIDE 2: ¿QUÉ? / ¿CÓMO? / DEFINICIONES CONCEPTUALES */
+    .s2-balanced-layout {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 24px;
+      height: calc(100% - 70px);
+    }
+
+    .s2-qc-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+    }
+
+    .s2-qc-card {
+      border: var(--border-thin);
+      padding: 20px 26px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .s2-qc-header {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      border-bottom: var(--border-dashed);
+      padding-bottom: 8px;
+    }
+
+    .s2-qc-tag {
+      font-family: var(--font-mono);
+      font-size: 1.05rem;
+      font-weight: 700;
+      background: var(--fg);
+      color: var(--bg);
+      padding: 2px 10px;
+    }
+
+    .s2-qc-title {
+      font-size: 1.45rem;
+      font-weight: 700;
+    }
+
+    .s2-def-quote {
+      font-size: 1.06rem;
+      line-height: 1.45;
+      color: #111;
+      margin-top: 4px;
+    }
+
+    .s2-def-sub {
+      font-size: 0.98rem;
+      line-height: 1.42;
+      color: var(--fg-muted);
+    }
+
+    .s2-theory-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      gap: 28px;
+      flex: 1;
+    }
+
+    .s2-theory-box {
+      border: var(--border-thin);
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .s2-theory-box.featured {
+      border: var(--border-thick);
+      background: var(--bg-muted);
+    }
+
+    .s2-theory-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: var(--border-dashed);
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+
+    .s2-theory-head h3 {
+      font-size: 1.45rem;
+      font-weight: 700;
+    }
+
+    .s2-theory-head span {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: var(--fg-muted);
+    }
+
+    .s2-axes-defs {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 12px;
+      border-top: var(--border-dashed);
+      padding-top: 12px;
+    }
+
+    .s2-axis-item {
+      font-size: 1.02rem;
+      line-height: 1.4;
+      padding-left: 14px;
+      border-left: var(--border-thick);
+    }
+
+    /* ==========================================================================
+       BLOQUE 2: METODOLOGÍA, TABLAS Y EJEMPLOS DE COMENTARIOS
+       ========================================================================== */
+    .split-2col {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 40px;
+      height: 100%;
+      align-items: start;
+    }
+
+    .split-equal {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 36px;
+      height: 100%;
+      align-items: stretch;
+    }
+
+    /* Tablas estilo Booktabs + Monocromo */
+    .academic-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 1.05rem;
+    }
+
+    .academic-table th {
+      border-top: var(--border-thick);
+      border-bottom: var(--border-thin);
+      padding: 10px 12px;
+      text-align: center;
+      font-weight: 700;
+      background: var(--bg-muted);
+    }
+
+    .academic-table th:first-child,
+    .academic-table td:first-child {
+      text-align: left;
+    }
+
+    .academic-table td {
+      padding: 10px 12px;
+      border-bottom: 1px dashed #cccccc;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 1rem;
+    }
+
+    .academic-table tr.total-row td {
+      border-top: var(--border-thin);
+      border-bottom: var(--border-thick);
+      font-weight: 700;
+      background: var(--bg-muted);
+    }
+
+    .academic-table tr.highlight-row td {
+      background: var(--fg);
+      color: var(--bg);
+      font-weight: 700;
+      border-bottom-color: var(--fg);
+    }
+
+    .table-caption {
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      color: var(--fg-muted);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    /* Tarjetas de ejemplos de comentarios */
+    .examples-column {
+      border: var(--border-thin);
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      background: var(--bg);
+    }
+
+    .examples-col-header {
+      border-bottom: var(--border-thick);
+      padding-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .examples-col-header h3 {
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+
+    .examples-col-header span {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+    }
+
+    .comment-item {
+      border-left: var(--border-thick);
+      padding-left: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .comment-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+    }
+
+    .level-pill {
+      background: var(--fg);
+      color: var(--bg);
+      padding: 2px 8px;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .comment-criteria {
+      color: var(--fg-muted);
+      font-family: var(--font-sans);
+      font-size: 0.92rem;
+    }
+
+    .comment-quote {
+      font-size: 1.05rem;
+      font-style: italic;
+      line-height: 1.42;
+      background: var(--bg-muted);
+      padding: 10px 14px;
+      border: 1px dashed #bbbbbb;
+    }
+
+    /* Grilla de 4 estrategias */
+    .strategies-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-top: 20px;
+    }
+
+    .strategy-card {
+      border: var(--border-thin);
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .strategy-card.featured {
+      border: var(--border-thick);
+      background: var(--bg-muted);
+    }
+
+    .strategy-num {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+    }
+
+    .strategy-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+
+    .strategy-desc {
+      font-size: 1.02rem;
+      line-height: 1.45;
+      color: #222;
+    }
+
+    /* ==========================================================================
+       BLOQUES 3 Y 4: RESULTADOS (TABLAS 3 A 6) Y CONCLUSIONES
+       ========================================================================== */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      margin: 22px 0;
+    }
+
+    .kpi-box {
+      border: var(--border-thin);
+      padding: 16px 20px;
+      background: var(--bg-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .kpi-box.primary {
+      border: var(--border-thick);
+      background: var(--fg);
+      color: var(--bg);
+    }
+
+    .kpi-box .kpi-label {
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
+    .kpi-box .kpi-val {
+      font-family: var(--font-mono);
+      font-size: 1.65rem;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .kpi-box .kpi-sub {
+      font-size: 0.9rem;
+      opacity: 0.85;
+    }
+
+    .cell-best {
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 4px;
+      background: #ebebeb;
+    }
+
+    .highlight-row .cell-best {
+      background: var(--fg);
+      color: var(--bg);
+    }
+
+    .conclusions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-bottom: 24px;
+      flex: 1;
+    }
+
+    .conclusion-card {
+      border: var(--border-thin);
+      padding: 24px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--bg);
+    }
+
+    .conclusion-card .c-num {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 700;
+      background: var(--fg);
+      color: var(--bg);
+      padding: 4px 10px;
+      align-self: flex-start;
+      text-transform: uppercase;
+    }
+
+    .conclusion-card h3 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1.28;
+      border-bottom: var(--border-dashed);
+      padding-bottom: 10px;
+    }
+
+    .conclusion-card p {
+      font-size: 1.02rem;
+      line-height: 1.48;
+      color: #222;
+    }
+
+    .future-bar {
+      border: var(--border-thick);
+      padding: 18px 26px;
+      background: var(--bg-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .future-bar-title {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      white-space: nowrap;
+      border-right: var(--border-dashed);
+      padding-right: 24px;
+    }
+
+    .future-bar-content {
+      font-size: 1rem;
+      line-height: 1.42;
+      flex: 1;
+    }
+
+    /* SLIDES 3 a 6: DECONSTRUCCIÓN DEL MODELO CIRCUNFLEJO */
+    .circumplex-layout {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 40px;
+      height: 100%;
+      align-items: center;
+    }
+
+    .circumplex-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      border-left: var(--border-thick);
+      padding-left: 28px;
+    }
+
+    .step-badge {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      color: var(--fg-muted);
+      letter-spacing: 1px;
+    }
+
+    .circumplex-title {
+      font-size: 2.15rem;
+      font-weight: 600;
+      line-height: 1.25;
+    }
+
+    .circumplex-plus {
+      font-family: var(--font-mono);
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 4px 0;
+    }
+
+    .circumplex-desc {
+      font-size: 1.12rem;
+      line-height: 1.55;
+      color: var(--fg-muted);
+      border-top: var(--border-dashed);
+      padding-top: 16px;
+    }
+
+    .circumplex-figure {
+      width: 100%;
+      height: 680px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .circumplex-figure img {
+      max-width: 100%;
+      max-height: 660px;
+      object-fit: contain;
+    }
+
+    /* SLIDES 7 a 9: HEATMAPS INDIVIDUALES */
+    .heatmap-single-layout {
+      display: grid;
+      grid-template-columns: 430px 1fr;
+      gap: 44px;
+      height: 100%;
+      align-items: center;
+    }
+
+    .model-info-panel {
+      border: var(--border-thin);
+      padding: 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      background: var(--bg);
+    }
+
+    .model-tag {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      background: var(--fg);
+      color: var(--bg);
+      padding: 4px 10px;
+      display: inline-block;
+      align-self: flex-start;
+      text-transform: uppercase;
+    }
+
+    .model-name {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .model-tech-spec {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      color: var(--fg-muted);
+      border-top: var(--border-dashed);
+      border-bottom: var(--border-dashed);
+      padding: 12px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .model-points {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .model-points li {
+      font-size: 1.12rem;
+      line-height: 1.48;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .model-points li::before {
+      content: "▪";
+      position: absolute;
+      left: 0;
+      font-family: var(--font-mono);
+    }
+
+    .heatmap-canvas {
+      height: 690px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: var(--border-thin);
+      padding: 16px;
+      background: #ffffff;
+    }
+
+    .heatmap-canvas img {
+      max-width: 100%;
+      max-height: 655px;
+      object-fit: contain;
+      cursor: zoom-in;
+    }
+
+    /* SLIDE 10: COMPARATIVO 3 MODELOS */
+    .comparativo-layout {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+      gap: 20px;
+    }
+
+    .comparativo-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: var(--border-thick);
+      padding-bottom: 12px;
+    }
+
+    .comparativo-header h2 {
+      font-size: 1.85rem;
+      font-weight: 700;
+    }
+
+    .comparativo-header span {
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      color: var(--fg-muted);
+    }
+
+    .comparativo-figure {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: var(--border-thin);
+      padding: 16px 24px;
+      background: #ffffff;
+      min-height: 0;
+    }
+
+    .comparativo-figure img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      cursor: zoom-in;
+    }
+
+    .comparativo-takeaways {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .takeaway-card {
+      border: var(--border-thin);
+      padding: 14px 20px;
+      background: var(--bg-muted);
+      font-size: 1rem;
+      line-height: 1.4;
+    }
+
+    .takeaway-card > strong:first-child {
+      font-family: var(--font-mono);
+      display: block;
+      margin-bottom: 6px;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      border-bottom: var(--border-dashed);
+      padding-bottom: 4px;
+    }
+
+    /* Modal de Zoom (Lightbox) para inspeccionar gráficos */
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.96);
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+      cursor: zoom-out;
+    }
+
+    .lightbox.open {
+      display: flex;
+    }
+
+    .lightbox img {
+      max-width: 95vw;
+      max-height: 88vh;
+      object-fit: contain;
+      border: var(--border-thick);
+      background: #fff;
+    }
+
+    .lightbox-bar {
+      font-family: var(--font-mono);
+      margin-bottom: 12px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    /* Modal de Índice Rápido (Tecla G) */
+    .overview-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.97);
+      z-index: 90;
+      display: none;
+      flex-direction: column;
+      padding: 48px 64px;
+      overflow-y: auto;
+    }
+
+    .overview-modal.open {
+      display: flex;
+    }
+
+    .overview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: var(--border-thick);
+      padding-bottom: 16px;
+      margin-bottom: 32px;
+      font-family: var(--font-mono);
+    }
+
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .overview-item {
+      border: var(--border-thin);
+      padding: 20px;
+      cursor: pointer;
+      background: var(--bg);
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+
+    .overview-item:hover, .overview-item.current {
+      border: var(--border-thick);
+      box-shadow: 3px 3px 0 var(--fg);
+      transform: translate(-2px, -2px);
+    }
+
+    .overview-item .ov-num {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: var(--fg-muted);
+      margin-bottom: 8px;
+    }
+
+    .overview-item .ov-title {
+      font-weight: 700;
+      font-size: 1.05rem;
+      line-height: 1.35;
+    }
+
+    /* ==========================================================================
+       MODO IMPRESIÓN / EXPORTACIÓN PDF (16:9 LANDSCAPE)
+       ========================================================================== */
+    @page {
+      size: 1600px 900px;
+      margin: 0;
+    }
+
+    @media print {
+      html, body {
+        width: 1600px;
+        height: auto;
+        overflow: visible !important;
+        background: #ffffff !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .deck-viewport {
+        width: 1600px;
+        height: auto;
+        display: block;
+      }
+
+      .deck-stage {
+        width: 1600px;
+        height: auto;
+        border: none !important;
+        transform: none !important;
+        display: block;
+        overflow: visible !important;
+      }
+
+      .progress-track,
+      .slide-topbar,
+      .slide-bottombar,
+      .lightbox,
+      .overview-modal {
+        display: none !important;
+      }
+
+      .slides-wrapper {
+        overflow: visible !important;
+        height: auto !important;
+      }
+
+      .slide {
+        position: relative !important;
+        inset: auto !important;
+        width: 1600px !important;
+        height: 900px !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        page-break-after: always;
+        break-after: page;
+        padding: 72px 80px 64px 80px !important;
+        border-bottom: 1px solid #eee;
+      }
+
+      .slide::before {
+        content: attr(data-section) "   ·   IIGG-UBA · EJE 9";
+        position: absolute;
+        top: 22px;
+        left: 80px;
+        right: 80px;
+        font-family: var(--font-mono);
+        font-size: 0.88rem;
+        color: var(--fg-muted);
+        border-bottom: var(--border-dashed);
+        padding-bottom: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="deck-viewport">
+    <div class="deck-stage" id="deckStage">
+      <!-- Barra de progreso -->
+      <div class="progress-track">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+
+      <!-- Barra superior -->
+      <header class="slide-topbar">
+        <div class="section-tag" id="sectionTag">// 01. PRESENTACIÓN</div>
+        <div class="context-tag">IIGG-UBA · EJE 9: TEORÍAS, EPISTEMOLOGÍAS Y METODOLOGÍAS</div>
+      </header>
+
+      <!-- Contenedor de Diapositivas (Bloque 1: Slides 1 a 10) -->
+      <main class="slides-wrapper">
+
+        <!-- ==================== SLIDE 1: PORTADA ==================== -->
+        <section class="slide active" data-section="// 01. PORTADA" data-title="Portada">
+          <div class="cover-layout">
+            <div class="cover-kicker">
+              Jornadas de Investigadores · Instituto de Investigaciones Gino Germani
+            </div>
+
+            <h1 class="cover-title">
+              <strong>Análisis comparativo</strong> de modelos <strong>RoBERTa</strong> y estrategias de <strong>clasificación</strong> para la medición <strong>ordinal</strong> de la <strong>polarización afectiva</strong> a partir del <strong>modelo circunflejo del afecto</strong>
+            </h1>
+
+            <div class="cover-footer">
+              <div>
+                <div class="cover-author-name">Agustín Nielsen (IIGG-FSOC-UBA)</div>
+                <div class="cover-author-role">Estudiante avanzado Lic. en Sociología (FSOC-UBA)</div>
+              </div>
+              <div class="cover-meta-box">
+                <div>EJE 9 · TEORÍAS, EPISTEMOLOGÍAS Y METODOLOGÍAS</div>
+                <div style="margin-top:4px; color:var(--fg-muted);">PLN · ANÁLISIS DE SENTIMIENTO · REGRESIÓN ORDINAL</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 2: ¿QUÉ? Y ¿CÓMO? + DEFINICIONES ==================== -->
+        <section class="slide" data-section="// 01. PROBLEMA Y MARCO TEÓRICO" data-title="¿Qué? ¿Cómo? y Definiciones Conceptuales">
+          <h2 class="slide-heading">
+            Planteo del problema y definiciones conceptuales
+            <span class="sub-mono">[ CASO: IMÁGENES CON IA DE JAVIER MILEI EN INSTAGRAM · OCT 2023 – DIC 2024 ]</span>
+          </h2>
+
+          <div class="s2-balanced-layout">
+            <!-- Fila superior: ¿Qué? y ¿Cómo? con sus definiciones -->
+            <div class="s2-qc-grid">
+              <div class="s2-qc-card">
+                <div class="s2-qc-header">
+                  <span class="s2-qc-tag">¿Qué?</span>
+                  <span class="s2-qc-title">Procesos de polarización afectiva</span>
+                </div>
+                <div class="s2-def-quote">
+                  <strong>Definición:</strong> “Distancia en grados de las emociones de votantes de distintos partidos al observar un mensaje político”, mediada por el aumento de la incivilidad en redes y la urgencia de interactuar validando o confrontando (Calvo &amp; Aruguete, 2023, pp. 56–57).
+                </div>
+                <div class="s2-def-sub">
+                  Las reacciones afectivas surgen frente a la <em>representación</em> dada por las imágenes generadas con IA (entendidas como elemento condensador en su contexto sociopolítico).
+                </div>
+              </div>
+
+              <div class="s2-qc-card">
+                <div class="s2-qc-header">
+                  <span class="s2-qc-tag">¿Cómo?</span>
+                  <span class="s2-qc-title">Clasificación automática · Análisis de sentimiento</span>
+                </div>
+                <div class="s2-def-quote">
+                  <strong>Definición:</strong> “La tarea de clasificar sentimiento, la orientación positiva o negativa que un escritor expresa hacia un objeto” (Jurafsky &amp; Martin, 2026, p. 92).
+                </div>
+                <div class="s2-def-sub">
+                  El sentimiento es bipolar y excluyente, y se da siempre <em>respecto a un otro</em> ante un estímulo: es el <strong>producto de una relación social</strong> y del posicionamiento de un actor frente a otro en los comentarios.
+                </div>
+              </div>
+            </div>
+
+            <!-- Fila inferior: Afecto nuclear vs. Episodios emocionales prototípicos -->
+            <div class="s2-theory-grid">
+              <div class="s2-theory-box featured">
+                <div>
+                  <div class="s2-theory-head">
+                    <h3>Afecto nuclear</h3>
+                    <span>Russell &amp; Feldman Barrett (1999)</span>
+                  </div>
+                  <p style="font-size: 1.15rem; line-height: 1.45;">
+                    <strong>“El sentimiento más elemental accesible desde la consciencia”</strong> (p. 806). Puede o no estar referido a un objeto y varía a través del tiempo.
+                  </p>
+                </div>
+
+                <div class="s2-axes-defs">
+                  <div class="s2-axis-item">
+                    <strong>Placer / Displacer:</strong> “qué tan bien le va a uno” (p. 809).
+                  </div>
+                  <div class="s2-axis-item">
+                    <strong>Activación / Desactivación:</strong> “refiere a la sensación de movilización o energía” (p. 809).
+                  </div>
+                </div>
+              </div>
+
+              <div class="s2-theory-box">
+                <div>
+                  <div class="s2-theory-head">
+                    <h3>Episodios emocionales prototípicos</h3>
+                    <span>Russell &amp; Feldman Barrett (1999)</span>
+                  </div>
+                  <ul class="clean-list" style="font-size: 1.12rem; gap: 12px;">
+                    <li style="font-size: 1.12rem;"><strong>Definición:</strong> “Un grupo complejo de eventos interrelacionados referidos a un objeto específico” (p. 806) — <em>ej.: ira, euforia, miedo o asco</em>.</li>
+                    <li style="font-size: 1.12rem;">Cualitativamente complejos de medir por fuera de casos ejemplares.</li>
+                    <li style="font-size: 1.12rem;">Se manifiestan en períodos específicos con un principio y fin.</li>
+                    <li style="font-size: 1.12rem;">Útiles desde la autocategorización, pero presentan dificultades para atribuirlos a los sujetos.</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 3: CIRCUMPLEX 1 ==================== -->
+        <section class="slide" data-section="// 01. MODELO CIRCUNFLEJO DEL AFECTO" data-title="Episodios emocionales prototípicos (I)">
+          <div class="circumplex-layout">
+            <div class="circumplex-sidebar">
+              <div class="step-badge">[ ESQUEMA TEÓRICO · PASO 1 / 4 ]</div>
+              <h2 class="circumplex-title">Episodios emocionales prototípicos</h2>
+              <div class="circumplex-desc">
+                Las emociones discretas clásicas (<em>sorpresa, miedo, ira, asco, tristeza, felicidad</em>) se ubican como referencias prototípicas alrededor del perímetro, pero no agotan el espacio afectivo continuo.
+              </div>
+            </div>
+            <div class="circumplex-figure">
+              <img src="Presentacion_BERT_assets/circumplex_1_episodios_ext.png" alt="Episodios emocionales prototípicos - exterior">
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 4: CIRCUMPLEX 2 ==================== -->
+        <section class="slide" data-section="// 01. MODELO CIRCUNFLEJO DEL AFECTO" data-title="Episodios emocionales prototípicos (II)">
+          <div class="circumplex-layout">
+            <div class="circumplex-sidebar">
+              <div class="step-badge">[ ESQUEMA TEÓRICO · PASO 2 / 4 ]</div>
+              <h2 class="circumplex-title">Episodios emocionales prototípicos</h2>
+              <div class="circumplex-desc">
+                Al incorporar matices afectivos intermedios (<em>alerta, entusiasmo, serenidad, fatiga, depresión, tensión</em>), se evidencia una gradación circular de estados afectivos.
+              </div>
+            </div>
+            <div class="circumplex-figure">
+              <img src="Presentacion_BERT_assets/circumplex_2_episodios_int.png" alt="Episodios emocionales prototípicos - interior">
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 5: CIRCUMPLEX 3 ==================== -->
+        <section class="slide" data-section="// 01. MODELO CIRCUNFLEJO DEL AFECTO" data-title="Episodios emocionales + Afecto nuclear">
+          <div class="circumplex-layout">
+            <div class="circumplex-sidebar">
+              <div class="step-badge">[ ESQUEMA TEÓRICO · PASO 3 / 4 ]</div>
+              <div>
+                <h2 class="circumplex-title">Episodios emocionales prototípicos</h2>
+                <div class="circumplex-plus">+</div>
+                <h2 class="circumplex-title">Afecto nuclear</h2>
+              </div>
+              <div class="circumplex-desc">
+                Los episodios emocionales se ordenan sobre una estructura analítica subyacente formada por dos ejes ortogonales: <strong>Activación / Desactivación</strong> (eje vertical) y <strong>Placer / Displacer</strong> (eje horizontal).
+              </div>
+            </div>
+            <div class="circumplex-figure">
+              <img src="Presentacion_BERT_assets/circumplex_3_ambos.png" alt="Episodios emocionales prototípicos + Afecto nuclear">
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 6: CIRCUMPLEX 4 ==================== -->
+        <section class="slide" data-section="// 01. MODELO CIRCUNFLEJO DEL AFECTO" data-title="Afecto nuclear (Plano Cartesiano)">
+          <div class="circumplex-layout">
+            <div class="circumplex-sidebar">
+              <div class="step-badge">[ ESQUEMA TEÓRICO · PASO 4 / 4 ]</div>
+              <h2 class="circumplex-title">Afecto nuclear</h2>
+              <div class="circumplex-desc">
+                Al abstraer el plano cartesiano bidimensional del <strong>afecto nuclear</strong>, obtenemos una escala continua y medible donde ubicar cada reacción afectiva según su valencia (<em>Unpleasant / Pleasant</em>) y su energía (<em>Deactivation / Activation</em>).
+              </div>
+            </div>
+            <div class="circumplex-figure">
+              <img src="Presentacion_BERT_assets/circumplex_4_afecto_nuclear.jpg" alt="Afecto nuclear - Ejes cartesianos">
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 7: HEATMAP 1 (ROBERTUITO BASE) ==================== -->
+        <section class="slide" data-section="// 02. ¿PARA QUÉ SIRVE EL MODELO? · EJEMPLO EMPÍRICO" data-title="Ejemplo de Resultados: RoBERTuito Base">
+          <div class="heatmap-single-layout">
+            <div class="model-info-panel">
+              <span class="model-tag">ESTRATEGIA 1 · SIN REENTRENAMIENTO</span>
+              <h2 class="model-name">RoBERTuito Base</h2>
+              <div class="model-tech-spec">
+                <div>ARQUITECTURA: RoBERTuito-base-uncased</div>
+                <div>ABORDAJE: Rúbrica directa (Zero-Shot)</div>
+                <div>SALIDA: 5 niveles discretos por eje (1 a 5)</div>
+              </div>
+              <ul class="model-points">
+                <li><strong>¿Cómo se lee el gráfico?</strong> Cada celda del plano cartesiano cruza el nivel asignado en <em>Displacer/Placer</em> (eje X) y <em>Desactivación/Activación</em> (eje Y).</li>
+                <li>Sin ajuste al contexto político local, el modelo concentra los casos en valores neutros o de baja activación (`Y = 1`) y no logra captar la ironía ni los términos partidarios.</li>
+              </ul>
+            </div>
+            <div class="heatmap-canvas">
+              <img src="Presentacion_BERT_assets/heatmap_case1_robertuito_base_escala_unificada.png" alt="Heatmap RoBERTuito Base" onclick="openLightbox(this.src, 'RoBERTuito Base — Escala Unificada')">
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 8: HEATMAP 2 (ROBERTUITO MULTICLASE) ==================== -->
+        <section class="slide" data-section="// 02. ¿PARA QUÉ SIRVE EL MODELO? · EJEMPLO EMPÍRICO" data-title="Ejemplo de Resultados: RoBERTuito Multiclase">
+          <div class="heatmap-single-layout">
+            <div class="model-info-panel">
+              <span class="model-tag">ESTRATEGIA 2 · FINE-TUNING NOMINAL</span>
+              <h2 class="model-name">RoBERTuito Multiclase</h2>
+              <div class="model-tech-spec">
+                <div>OPTIMIZACIÓN: Función Softmax (Cross-Entropy)</div>
+                <div>ENTRENAMIENTO: Muestra anotada (n = 2.499)</div>
+                <div>SALIDA: 5 clases nominales independientes</div>
+              </div>
+              <ul class="model-points">
+                <li>Al incorporar el aprendizaje sobre el corpus propio, el modelo reconoce la polarización afectiva y desplaza la distribución hacia los cuadrantes activos.</li>
+                <li><strong>Límite del enfoque nominal:</strong> La función <em>Softmax</em> asigna todo el peso a la categoría más probable, encasillando masivamente los comentarios en celdas discretas puntuales (como el bloque `(5, 4)`).</li>
+              </ul>
+            </div>
+            <div class="heatmap-canvas">
+              <img src="Presentacion_BERT_assets/heatmap_case1_fine_tuned_escala_unificada.png" alt="Heatmap RoBERTuito Multiclase" onclick="openLightbox(this.src, 'RoBERTuito Multiclase — Escala Unificada')">
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 9: HEATMAP 3 (ROBERTUITO REGRESIÓN) ==================== -->
+        <section class="slide" data-section="// 02. ¿PARA QUÉ SIRVE EL MODELO? · EJEMPLO EMPÍRICO" data-title="Ejemplo de Resultados: RoBERTuito Regresión">
+          <div class="heatmap-single-layout">
+            <div class="model-info-panel">
+              <span class="model-tag">ESTRATEGIA 3 · FINE-TUNING ORDINAL</span>
+              <h2 class="model-name">RoBERTuito Regresión</h2>
+              <div class="model-tech-spec">
+                <div>OPTIMIZACIÓN: Error Cuadrático Medio (MSE)</div>
+                <div>CAPA FINAL: 1 neurona lineal continua [1.0 – 5.0]</div>
+                <div>VISUALIZACIÓN: Grilla + Nube de puntos sin redondear</div>
+              </div>
+              <ul class="model-points">
+                <li>Al tratar las dimensiones como un <strong>continuo ordinal</strong> y penalizar la distancia del error, cada comentario se ubica con coordenadas exactas en el plano del afecto nuclear.</li>
+                <li>Permite observar la <strong>estructura real de la discusión pública</strong>: una transición orgánica desde el rechazo moderado/indignado hacia el núcleo de alta validación militante (placer + activación).</li>
+              </ul>
+            </div>
+            <div class="heatmap-canvas">
+              <img src="Presentacion_BERT_assets/heatmap_case1_regresion_escala_unificada.png" alt="Heatmap RoBERTuito Regresión" onclick="openLightbox(this.src, 'RoBERTuito Regresión — Escala Unificada')">
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 10: HEATMAP COMPARATIVO ==================== -->
+        <section class="slide" data-section="// 02. ¿PARA QUÉ SIRVE EL MODELO? · SÍNTESIS VISUAL" data-title="Comparación de los 3 Modelos en Escala Unificada">
+          <div class="comparativo-layout">
+            <div class="comparativo-header">
+              <h2>Del modelo base a la regresión ordinal: impacto en la medición</h2>
+              <span>[ CLIC EN LA IMAGEN PARA AMPLIAR · ESCALA UNIFICADA 0 – 25.000 CASOS ]</span>
+            </div>
+
+            <div class="comparativo-figure">
+              <img src="Presentacion_BERT_assets/heatmap_case1_comparativo_3_modelos.svg" alt="Comparativo 3 modelos" onclick="openLightbox('Presentacion_BERT_assets/heatmap_case1_comparativo_3_modelos.svg', 'Comparativo de los 3 Modelos — Escala Unificada')">
+            </div>
+
+            <div class="comparativo-takeaways">
+              <div class="takeaway-card">
+                <strong>1. RoBERTuito Base</strong>
+                Sin <em>fine-tuning</em> específico, no comprende el registro político local y distorsiona la distribución hacia el borde inferior.
+              </div>
+              <div class="takeaway-card">
+                <strong>2. RoBERTuito Multiclase (Softmax)</strong>
+                Captura la orientación general pero rigidiza el espacio afectivo en compartimentos estancos, perdiendo los matices intermedios.
+              </div>
+              <div class="takeaway-card">
+                <strong>3. RoBERTuito Regresión (MSE)</strong>
+                Reconstruye la topografía continua del afecto nuclear, permitiendo medir grados de polarización afectiva y evitar inversiones polares.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 11: CASO DE ESTUDIO Y MUESTRA (TABLA 1) ==================== -->
+        <section class="slide" data-section="// 03. DISEÑO METODOLÓGICO" data-title="Muestra Anotada y Distribución (Tabla 1)">
+          <h2 class="slide-heading">
+            Corpus y distribución de la muestra anotada
+            <span class="sub-mono">[ n = 2.499 · N = 357.436 COMENTARIOS ]</span>
+          </h2>
+
+          <div class="split-2col">
+            <div>
+              <div class="table-caption">Tabla 1. Distribución muestral de las dimensiones placer/displacer y activación/desactivación</div>
+              <table class="academic-table">
+                <thead>
+                  <tr>
+                    <th rowspan="2">Valor</th>
+                    <th colspan="2">Placer / Displacer</th>
+                    <th colspan="2">Activación / Desactivación</th>
+                  </tr>
+                  <tr>
+                    <th>Frecuencia (n)</th>
+                    <th>Porcentaje (%)</th>
+                    <th>Frecuencia (n)</th>
+                    <th>Porcentaje (%)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>1</strong> (Extremo inf.)</td>
+                    <td>571</td>
+                    <td>22,85%</td>
+                    <td>357</td>
+                    <td>14,29%</td>
+                  </tr>
+                  <tr>
+                    <td><strong>2</strong></td>
+                    <td>558</td>
+                    <td>22,33%</td>
+                    <td>433</td>
+                    <td>17,33%</td>
+                  </tr>
+                  <tr>
+                    <td><strong>3</strong> (Neutro / Medio)</td>
+                    <td>322</td>
+                    <td>12,89%</td>
+                    <td><strong>818</strong></td>
+                    <td><strong>32,73%</strong></td>
+                  </tr>
+                  <tr>
+                    <td><strong>4</strong></td>
+                    <td>363</td>
+                    <td>14,53%</td>
+                    <td>575</td>
+                    <td>23,01%</td>
+                  </tr>
+                  <tr>
+                    <td><strong>5</strong> (Extremo sup.)</td>
+                    <td><strong>685</strong></td>
+                    <td><strong>27,41%</strong></td>
+                    <td>316</td>
+                    <td>12,65%</td>
+                  </tr>
+                  <tr class="total-row">
+                    <td>Total</td>
+                    <td>2.499</td>
+                    <td>100,00%</td>
+                    <td>2.499</td>
+                    <td>100,00%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="model-info-panel" style="height: 100%; justify-content: space-between;">
+              <div>
+                <span class="model-tag">RECOLECCIÓN Y CODIFICACIÓN</span>
+                <h3 style="font-size: 1.5rem; margin-top: 14px; margin-bottom: 10px;">Comentarios en Instagram (Oct 2023 – Dic 2024)</h3>
+                <p style="font-size: 1.05rem; color: var(--fg-muted); line-height: 1.45;">
+                  Publicaciones de imágenes generadas con inteligencia artificial por Javier Milei (elemento condensador en su contexto sociopolítico).
+                </p>
+              </div>
+
+              <div class="model-tech-spec">
+                <div>MUESTRA ALEATORIA: n = 2.499 (de N = 357.436)</div>
+                <div>ENTRENAMIENTO (90%): n₁ = 2.249 (semilla 42)</div>
+                <div>EVALUACIÓN (10%): n₂ = 250 (reserva estricta)</div>
+                <div>PREPROCESAMIENTO: preprocess_tweet (pysentimiento)</div>
+              </div>
+
+              <ul class="model-points" style="font-size: 1rem;">
+                <li><strong>Placer / Displacer:</strong> Distribución bimodal concentrada en los polos de rechazo (`1–2`: 45,2%) y apoyo (`5`: 27,4%).</li>
+                <li><strong>Activación / Desactivación:</strong> Distribución centrada en el nivel medio (`3`: 32,7%).</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 12: MANUAL DE CÓDIGOS Y EJEMPLOS (ANEXO) ==================== -->
+        <section class="slide" data-section="// 03. DISEÑO METODOLÓGICO · ANEXO" data-title="Criterios de Clasificación y Ejemplos Reales">
+          <h2 class="slide-heading">
+            Operacionalización: ejemplos ilustrativos del manual de códigos
+            <span class="sub-mono">[ TABLAS 7 Y 8 DEL ANEXO · ESCALA ORDINAL 1 A 5 ]</span>
+          </h2>
+
+          <div class="split-equal" style="height: calc(100% - 80px);">
+            <!-- Columna Placer / Displacer -->
+            <div class="examples-column">
+              <div class="examples-col-header">
+                <h3>Dimensión Placer / Displacer</h3>
+                <span>VALENCIA AFECTIVA</span>
+              </div>
+
+              <div class="comment-item">
+                <div class="comment-meta">
+                  <span class="level-pill">VALOR 1</span>
+                  <span class="comment-criteria">Insultos, apodos de rechazo ("presiduende", "kukas"), crítica directa</span>
+                </div>
+                <div class="comment-quote">
+                  "No se puede ser tan stupid0 no se puede ser tan colonizado mentalmente tan subordinado intelectualmente tan chiquito de pies cabeza y neuronas."
+                </div>
+              </div>
+
+              <div class="comment-item">
+                <div class="comment-meta">
+                  <span class="level-pill">VALOR 2</span>
+                  <span class="comment-criteria">Posición negativa sin insultos ni mayúsculas; desilusión</span>
+                </div>
+                <div class="comment-quote">
+                  "Todo lo que iba a hacer, se transformó en otra cosa.. que vergonzoso."
+                </div>
+              </div>
+
+              <div class="comment-item">
+                <div class="comment-meta">
+                  <span class="level-pill">VALOR 5</span>
+                  <span class="comment-criteria">Palabras/emojis clave de apoyo ("VLLC", leones), mayúsculas, validación directa</span>
+                </div>
+                <div class="comment-quote">
+                  "VAMOOOSSS JAVIER, BIENVENIDA Patricia 🙌🙌🙌 CUIDEMOS AMEMOS RESPETEMOS A NUESTRO HERMOSO PAIS🇦🇷LUCHEMOS SALGAMOS ADELANTE."
+                </div>
+              </div>
+            </div>
+
+            <!-- Columna Activación / Desactivación -->
+            <div class="examples-column">
+              <div class="examples-col-header">
+                <h3>Dimensión Activación / Desactivación</h3>
+                <span>MOVILIZACIÓN / ENERGÍA</span>
+              </div>
+
+              <div class="comment-item">
+                <div class="comment-meta">
+                  <span class="level-pill">VALOR 1</span>
+                  <span class="comment-criteria">Sin emojis, sin signos de exclamación ni mayúsculas; baja intensidad</span>
+                </div>
+                <div class="comment-quote">
+                  "Esperemos verlos sesionar para beneficio de la sociedad."
+                </div>
+              </div>
+
+              <div class="comment-item">
+                <div class="comment-meta">
+                  <span class="level-pill">VALOR 3</span>
+                  <span class="comment-criteria">Alto rechazo semántico pero articulado desde el agotamiento/tristeza (sin mayúsculas)</span>
+                </div>
+                <div class="comment-quote">
+                  "Esoty re podrido del kirchnerismo vamos a probar algo nuevo gente no se puede salir ni a la veredad con la famillia por q te matan por un celular 😢😢."
+                </div>
+              </div>
+
+              <div class="comment-item">
+                <div class="comment-meta">
+                  <span class="level-pill">VALOR 5</span>
+                  <span class="comment-criteria">Emojis clave, exclamación, mayúsculas sostenidas y confrontación directa</span>
+                </div>
+                <div class="comment-quote">
+                  "@monickant JAJAJAAJAJAJJAUAUAUAUAUA DALE CHAU (la enfe rma que viene a bardear sos vos mamu) besis"
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 13: MODELOS BASE Y 4 ESTRATEGIAS ==================== -->
+        <section class="slide" data-section="// 03. DISEÑO METODOLÓGICO" data-title="Modelos Base y las 4 Estrategias de Modelado">
+          <h2 class="slide-heading">
+            Arquitecturas Transformer y estrategias de modelado
+            <span class="sub-mono">[ 2 MODELOS BASE × 4 ESTRATEGIAS DE CLASIFICACIÓN ]</span>
+          </h2>
+
+          <div class="split-equal" style="height: auto; margin-bottom: 10px;">
+            <div class="theory-box" style="padding: 20px 26px;">
+              <h3>
+                XLM-RoBERTa-Large-XNLI
+                <span class="cite">Davison (2020) / Conneau et al. (2020)</span>
+              </h3>
+              <div class="model-tech-spec" style="margin: 6px 0; padding: 8px 0;">
+                <div>PARÁMETROS: 565 millones (24 capas) · 100 idiomas (2,5 TB)</div>
+              </div>
+              <p style="font-size: 1.02rem; color: var(--fg-muted);">
+                Entrenado sobre fuentes formales multilingües (Wikipedia y sitios de noticias).
+              </p>
+            </div>
+
+            <div class="theory-box highlight" style="padding: 20px 26px;">
+              <h3>
+                RoBERTuito-base-uncased
+                <span class="cite">Pérez et al. (2022)</span>
+              </h3>
+              <div class="model-tech-spec" style="margin: 6px 0; padding: 8px 0;">
+                <div>PARÁMETROS: 108 millones (12 capas) · 500M tweets en español</div>
+              </div>
+              <p style="font-size: 1.02rem; color: var(--fg-muted);">
+                Diseñado con tokenizador específico para redes sociales (identifica emojis, risas, URLs, menciones y hashtags).
+              </p>
+            </div>
+          </div>
+
+          <div class="strategies-grid">
+            <div class="strategy-card">
+              <div class="strategy-num">ESTRATEGIA 01 · ZERO-SHOT MULTILINGÜE</div>
+              <div class="strategy-title">XLM-RoBERTa-Large (Rúbrica)</div>
+              <div class="strategy-desc">
+                Clasificación directa mediante indicación (<em>prompt</em> / rúbrica) con las categorías de Russell &amp; Feldman Barrett (1999), sin ajuste de pesos.
+              </div>
+            </div>
+
+            <div class="strategy-card">
+              <div class="strategy-num">ESTRATEGIA 02 · MODELO BASE EN ESPAÑOL</div>
+              <div class="strategy-title">RoBERTuito Base (Rúbrica)</div>
+              <div class="strategy-desc">
+                Evaluación directa del modelo preentrenado en tweets en español utilizando la misma rúbrica sin reentrenamiento local.
+              </div>
+            </div>
+
+            <div class="strategy-card">
+              <div class="strategy-num">ESTRATEGIA 03 · FINE-TUNING MULTICLASE</div>
+              <div class="strategy-title">RoBERTuito + Función Softmax</div>
+              <div class="strategy-desc">
+                Reentrenamiento con los 2.249 casos anotados. Capa final de <strong>5 salidas nominales independientes</strong>: asigna la clase de mayor probabilidad sin medir distancia entre niveles.
+              </div>
+            </div>
+
+            <div class="strategy-card featured">
+              <div class="strategy-num">ESTRATEGIA 04 · FINE-TUNING POR REGRESIÓN ORDINAL</div>
+              <div class="strategy-title">RoBERTuito + Error Cuadrático Medio (MSE)</div>
+              <div class="strategy-desc">
+                Adaptación de la capa final a <strong>1 única neurona lineal continua (1,0 a 5,0)</strong>. Optimización por MSE penalizando la distancia métrica del error entre categorías.
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 14: ENTRENAMIENTO (TABLA 2) Y CRITERIOS ==================== -->
+        <section class="slide" data-section="// 03. ENTRENAMIENTO Y CRITERIOS DE EVALUACIÓN" data-title="Progresión por Época (Tabla 2) y Costo del Error">
+          <h2 class="slide-heading">
+            Ajuste del entrenamiento y criterios de evaluación
+            <span class="sub-mono">[ ADAMW · LR = 2e-5 · BATCH = 16 · MAX_LEN = 128 TOKENS ]</span>
+          </h2>
+
+          <div class="split-2col">
+            <div>
+              <div class="table-caption">Tabla 2. Progresión del entrenamiento por época y métricas del ajuste multiclase (n = 250)</div>
+              <table class="academic-table">
+                <thead>
+                  <tr>
+                    <th>Tarea</th>
+                    <th>Época</th>
+                    <th>Eval Loss</th>
+                    <th>Eval Accuracy</th>
+                    <th>Macro F1</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td rowspan="4"><strong>Placer /<br>Displacer</strong></td>
+                    <td>1</td>
+                    <td>1.1170</td>
+                    <td>58.00%</td>
+                    <td>0.4151</td>
+                    <td>0.4814</td>
+                    <td>0.4561</td>
+                  </tr>
+                  <tr>
+                    <td>2</td>
+                    <td>0.9796</td>
+                    <td>60.40%</td>
+                    <td>0.5226</td>
+                    <td>0.5677</td>
+                    <td>0.5225</td>
+                  </tr>
+                  <tr class="highlight-row">
+                    <td>3*</td>
+                    <td>0.9364</td>
+                    <td>62.40%</td>
+                    <td>0.5505</td>
+                    <td>0.5579</td>
+                    <td>0.5534</td>
+                  </tr>
+                  <tr>
+                    <td>4</td>
+                    <td>0.9724</td>
+                    <td>58.40%</td>
+                    <td>0.5209</td>
+                    <td>0.5211</td>
+                    <td>0.5227</td>
+                  </tr>
+                  <tr style="border-top: var(--border-thin);">
+                    <td rowspan="4"><strong>Activación /<br>Desactivación</strong></td>
+                    <td>1</td>
+                    <td>1.5160</td>
+                    <td>29.60%</td>
+                    <td>0.1469</td>
+                    <td>0.2208</td>
+                    <td>0.2283</td>
+                  </tr>
+                  <tr>
+                    <td>2</td>
+                    <td>1.3630</td>
+                    <td>38.00%</td>
+                    <td>0.3555</td>
+                    <td>0.4090</td>
+                    <td>0.3534</td>
+                  </tr>
+                  <tr class="highlight-row">
+                    <td>3*</td>
+                    <td>1.3580</td>
+                    <td>39.60%</td>
+                    <td>0.3900</td>
+                    <td>0.4622</td>
+                    <td>0.3793</td>
+                  </tr>
+                  <tr>
+                    <td>4</td>
+                    <td>1.3750</td>
+                    <td>39.20%</td>
+                    <td>0.3764</td>
+                    <td>0.4091</td>
+                    <td>0.3707</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div style="font-family: var(--font-mono); font-size: 0.85rem; color: var(--fg-muted); margin-top: 10px;">
+                * Punto óptimo seleccionado (menor Eval Loss para prevenir sobreajuste). Ambos modelos superan el azar estadístico (20%).
+              </div>
+            </div>
+
+            <div class="model-info-panel">
+              <span class="model-tag">CRITERIOS DE EVALUACIÓN (APARTADO 3.1.1)</span>
+              <h3 style="font-size: 1.45rem; font-weight: 700;">¿Por qué Exactitud Tolerante (±1) y Correlaciones?</h3>
+              <p style="font-size: 1.05rem; line-height: 1.48;">
+                En el estudio de la <strong>polarización afectiva</strong>, no todos los errores de clasificación tienen el mismo costo sustantivo:
+              </p>
+              <ul class="model-points" style="font-size: 1.02rem;">
+                <li><strong>Error grave (Inversión polar):</strong> Confundir un extremo displacer (<code>valor 1</code>) con un extremo placer (<code>valor 5</code>) invierte el sentido político del comentario.</li>
+                <li><strong>Error leve (Intensidad):</strong> Confundir un displacer extremo (<code>valor 1</code>) con uno moderado (<code>valor 2</code>) conserva la dirección del afecto.</li>
+                <li>Por ello se evalúa <strong>Acc Exacta</strong>, <strong>Acc Tolerante (±1)</strong>, <strong>F1 Macro</strong> y los coeficientes <strong>Pearson (<em>r</em>)</strong> y <strong>Spearman (<em>ρ</em>)</strong>.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 15: RESULTADOS GLOBALES PLACER/DISPLACER (TABLA 3) ==================== -->
+        <section class="slide" data-section="// 04. RESULTADOS · EVALUACIÓN GLOBAL" data-title="Desempeño Global: Placer / Displacer (Tabla 3)">
+          <h2 class="slide-heading">
+            Evaluación global en la dimensión Placer / Displacer
+            <span class="sub-mono">[ APARTADO 3.1.2 · MUESTRA DE EVALUACIÓN n = 250 ]</span>
+          </h2>
+
+          <div class="table-caption">Tabla 3. Métricas globales de desempeño y concordancia para la dimensión placer/displacer (n = 250)</div>
+          <table class="academic-table">
+            <thead>
+              <tr>
+                <th>Modelo</th>
+                <th>Acc Exacta</th>
+                <th>Acc Tol (±1)</th>
+                <th>Macro F1</th>
+                <th>Prec</th>
+                <th>Rec</th>
+                <th>Pearson (<em>r</em>)</th>
+                <th>Spearman (<em>ρ</em>)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="highlight-row">
+                <td>RoBERTuito Regresión</td>
+                <td>69.60%</td>
+                <td>98.40%</td>
+                <td>0.6542</td>
+                <td>0.6559</td>
+                <td>0.6623</td>
+                <td>0.9436</td>
+                <td>0.9185</td>
+              </tr>
+              <tr>
+                <td><strong>RoBERTuito Multiclase</strong></td>
+                <td>62.40%</td>
+                <td>88.40%</td>
+                <td>0.5505</td>
+                <td>0.5579</td>
+                <td>0.5534</td>
+                <td>0.7877</td>
+                <td>0.7752</td>
+              </tr>
+              <tr>
+                <td>XLM-RoBERTa Large</td>
+                <td>30.00%</td>
+                <td>58.00%</td>
+                <td>0.2872</td>
+                <td>0.3301</td>
+                <td>0.2869</td>
+                <td>0.1509</td>
+                <td>0.1513</td>
+              </tr>
+              <tr>
+                <td>RoBERTuito Base</td>
+                <td>29.20%</td>
+                <td>50.40%</td>
+                <td>0.2333</td>
+                <td>0.2356</td>
+                <td>0.2344</td>
+                <td>0.1186</td>
+                <td>0.1412</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- KPIs destacados -->
+          <div class="kpi-strip">
+            <div class="kpi-box primary">
+              <span class="kpi-label">Acc Tolerante (±1) · Regresión</span>
+              <span class="kpi-val">98,40%</span>
+              <span class="kpi-sub">+10 pp frente al modelo Multiclase (88,40%)</span>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label">Correlación Lineal y de Rango</span>
+              <span class="kpi-val">r = 0,94 · ρ = 0,92</span>
+              <span class="kpi-sub">Relación muy fuerte (vs. r = 0,79 en Multiclase)</span>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label">Efecto del Fine-Tuning</span>
+              <span class="kpi-val">×2 Rendimiento</span>
+              <span class="kpi-sub">Duplica Acc Exacta y F1 Macro de modelos base</span>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label">Modelos Base (Sin Ajuste)</span>
+              <span class="kpi-val">r = 0,15 / 0,12</span>
+              <span class="kpi-sub">XLM-R supera en solo 2 casos a RoBERTuito Base</span>
+            </div>
+          </div>
+
+          <div class="comparativo-takeaways" style="grid-template-columns: 1fr 1fr;">
+            <div class="takeaway-card">
+              <strong>Relevancia de la Regresión Ordinal</strong>
+              Al optimizar por MSE sobre embeddings transformer, el margen de error se reduce al mínimo (98,40% dentro de ±1 nivel), evitando inversiones polares en la lectura de comentarios.
+            </div>
+            <div class="takeaway-card">
+              <strong>Comportamiento de los Modelos Base</strong>
+              Sin reentrenamiento, las correlaciones son débiles. La leve ventaja de <em>XLM-RoBERTa Large</em> sobre <em>RoBERTuito Base</em> (30,0% vs. 29,2%) responde a su mayor escala (565M en 24 capas vs. 108M en 12 capas).
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 16: RESULTADOS GLOBALES ACTIVACIÓN/DESACTIVACIÓN (TABLA 4) ==================== -->
+        <section class="slide" data-section="// 04. RESULTADOS · EVALUACIÓN GLOBAL" data-title="Desempeño Global: Activación / Desactivación (Tabla 4)">
+          <h2 class="slide-heading">
+            Evaluación global en la dimensión Activación / Desactivación
+            <span class="sub-mono">[ APARTADO 3.1.3 · MUESTRA DE EVALUACIÓN n = 250 ]</span>
+          </h2>
+
+          <div class="table-caption">Tabla 4. Métricas globales de desempeño y concordancia para la dimensión activación/desactivación (n = 250)</div>
+          <table class="academic-table">
+            <thead>
+              <tr>
+                <th>Modelo</th>
+                <th>Acc Exacta</th>
+                <th>Acc Tol (±1)</th>
+                <th>Macro F1</th>
+                <th>Prec</th>
+                <th>Rec</th>
+                <th>Pearson (<em>r</em>)</th>
+                <th>Spearman (<em>ρ</em>)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="highlight-row">
+                <td>RoBERTuito Regresión</td>
+                <td>48.40%</td>
+                <td>92.80%</td>
+                <td>0.4450</td>
+                <td>0.5008</td>
+                <td>0.4390</td>
+                <td>0.7326</td>
+                <td>0.7170</td>
+              </tr>
+              <tr>
+                <td><strong>RoBERTuito Multiclase</strong></td>
+                <td>39.60%</td>
+                <td>84.00%</td>
+                <td>0.3900</td>
+                <td>0.4622</td>
+                <td>0.3793</td>
+                <td>0.5937</td>
+                <td>0.5825</td>
+              </tr>
+              <tr>
+                <td>RoBERTuito Base</td>
+                <td>20.00%</td>
+                <td>55.20%</td>
+                <td>0.1710</td>
+                <td>0.2536</td>
+                <td>0.1870</td>
+                <td>-0.0648</td>
+                <td>-0.0664</td>
+              </tr>
+              <tr>
+                <td>XLM-RoBERTa Large</td>
+                <td>12.40%</td>
+                <td>44.00%</td>
+                <td>0.1138</td>
+                <td>0.1962</td>
+                <td>0.1544</td>
+                <td>-0.0537</td>
+                <td>-0.0271</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- KPIs destacados -->
+          <div class="kpi-strip">
+            <div class="kpi-box primary">
+              <span class="kpi-label">Acc Tolerante (±1) · Regresión</span>
+              <span class="kpi-val">92,80%</span>
+              <span class="kpi-sub">Frente a 84,00% en Multiclase y 55,20% en Base</span>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label">Consistencia Direccional</span>
+              <span class="kpi-val">r = 0,73 · ρ = 0,72</span>
+              <span class="kpi-sub">Relación fuerte que captura la tendencia afectiva</span>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label">Acc Exacta vs. Azar (20%)</span>
+              <span class="kpi-val">48,40%</span>
+              <span class="kpi-sub">Supera ampliamente el azar (XLM-R cae a 12,40%)</span>
+            </div>
+            <div class="kpi-box">
+              <span class="kpi-label">Ventaja de Dominio Lingüístico</span>
+              <span class="kpi-val">Tweets &gt; Wiki</span>
+              <span class="kpi-sub">RoBERTuito Base supera a XLM-RoBERTa en coloquial</span>
+            </div>
+          </div>
+
+          <div class="comparativo-takeaways" style="grid-template-columns: 1fr 1fr;">
+            <div class="takeaway-card">
+              <strong>¿Por qué es más compleja esta dimensión en PLN?</strong>
+              Mientras el placer/displacer tiene marcadores léxicos explícitos (elogios, insultos), la activación es contextual: un <strong>alto displacer</strong> puede expresarse con <em>alta activación</em> (ira, indignación) o con <em>fuerte desactivación</em> (tristeza, decepción, resignación).
+            </div>
+            <div class="takeaway-card">
+              <strong>Peso del corpus de preentrenamiento</strong>
+              En esta dimensión sutil, <em>RoBERTuito Base</em> (entrenado con tweets coloquiales en español) supera claramente a <em>XLM-RoBERTa Large</em> (entrenado en Wikipedia y noticias), que queda por debajo del azar estadístico (12,40%).
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 17: DESEMPEÑO POR NIVEL (TABLAS 5 Y 6) ==================== -->
+        <section class="slide" data-section="// 04. RESULTADOS · ANÁLISIS POR NIVEL" data-title="Desempeño por Nivel: Polos vs. Intermedios (Tablas 5 y 6)">
+          <h2 class="slide-heading">
+            Desempeño discriminativo por nivel (F1-Score): polos vs. matices
+            <span class="sub-mono">[ APARTADOS 3.2.1 Y 3.2.2 · COMPROMISO ENTRE MSE Y SOFTMAX ]</span>
+          </h2>
+
+          <div class="split-equal" style="height: auto; margin-bottom: 20px;">
+            <div>
+              <div class="table-caption">Tabla 5. F1-Score por nivel y Macro F1 · Placer / Displacer (n = 250)</div>
+              <table class="academic-table">
+                <thead>
+                  <tr>
+                    <th>Modelo</th>
+                    <th>Nivel 1</th>
+                    <th>Nivel 2</th>
+                    <th>Nivel 3</th>
+                    <th>Nivel 4</th>
+                    <th>Nivel 5</th>
+                    <th>Macro F1</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>RoBERTuito Regresión</strong></td>
+                    <td class="cell-best">0.75</td>
+                    <td>0.61</td>
+                    <td class="cell-best">0.53</td>
+                    <td class="cell-best">0.52</td>
+                    <td class="cell-best">0.86</td>
+                    <td class="cell-best">0.6542</td>
+                  </tr>
+                  <tr>
+                    <td>RoBERTuito Multiclase</td>
+                    <td>0.70</td>
+                    <td class="cell-best">0.62</td>
+                    <td>0.38</td>
+                    <td>0.29</td>
+                    <td>0.76</td>
+                    <td>0.5505</td>
+                  </tr>
+                  <tr>
+                    <td>XLM-RoBERTa Large</td>
+                    <td>0.35</td>
+                    <td>0.30</td>
+                    <td>0.29</td>
+                    <td>0.17</td>
+                    <td>0.33</td>
+                    <td>0.2872</td>
+                  </tr>
+                  <tr>
+                    <td>RoBERTuito Base</td>
+                    <td>0.37</td>
+                    <td>0.32</td>
+                    <td>0.00</td>
+                    <td>0.10</td>
+                    <td>0.37</td>
+                    <td>0.2333</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div>
+              <div class="table-caption">Tabla 6. F1-Score por nivel y Macro F1 · Activación / Desactivación (n = 250)</div>
+              <table class="academic-table">
+                <thead>
+                  <tr>
+                    <th>Modelo</th>
+                    <th>Nivel 1</th>
+                    <th>Nivel 2</th>
+                    <th>Nivel 3</th>
+                    <th>Nivel 4</th>
+                    <th>Nivel 5</th>
+                    <th>Macro F1</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>RoBERTuito Regresión</strong></td>
+                    <td>0.41</td>
+                    <td class="cell-best">0.45</td>
+                    <td class="cell-best">0.57</td>
+                    <td class="cell-best">0.49</td>
+                    <td>0.31</td>
+                    <td class="cell-best">0.4450</td>
+                  </tr>
+                  <tr>
+                    <td>RoBERTuito Multiclase</td>
+                    <td class="cell-best">0.43</td>
+                    <td>0.35</td>
+                    <td>0.45</td>
+                    <td>0.35</td>
+                    <td class="cell-best">0.37</td>
+                    <td>0.3900</td>
+                  </tr>
+                  <tr>
+                    <td>RoBERTuito Base</td>
+                    <td>0.20</td>
+                    <td>0.13</td>
+                    <td>0.19</td>
+                    <td>0.27</td>
+                    <td>0.06</td>
+                    <td>0.1710</td>
+                  </tr>
+                  <tr>
+                    <td>XLM-RoBERTa Large</td>
+                    <td>0.04</td>
+                    <td>0.18</td>
+                    <td>0.05</td>
+                    <td>0.16</td>
+                    <td>0.13</td>
+                    <td>0.1138</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="comparativo-takeaways">
+            <div class="takeaway-card">
+              <strong>Niveles Intermedios (2, 3 y 4) → Gana Regresión (MSE)</strong>
+              Con idéntica arquitectura e hiperparámetros, la optimización por MSE supera holgadamente a Softmax en las posiciones moderadas e intermedias en ambas dimensiones (ej. <code>0,53 vs 0,38</code> en Nivel 3 de Placer y <code>0,57 vs 0,45</code> en Activación).
+            </div>
+            <div class="takeaway-card">
+              <strong>Polos Extremos (1 y 5) → Compite Multiclase (Softmax)</strong>
+              En Activación/Desactivación, Multiclase conserva ventaja en el <code>Nivel 1 (0,43 vs 0,41)</code> y <code>Nivel 5 (0,37 vs 0,31)</code>. Softmax amplifica no linealmente las probabilidades ante marcadores léxicos extremos.
+            </div>
+            <div class="takeaway-card">
+              <strong>Explicación: Compresión de Bordes en MSE</strong>
+              Al acotar predicciones en <code>[1.0, 5.0]</code> y penalizar desviaciones, la regresión dispone de solo <strong>0,5 unidades</strong> de margen en los extremos (1 y 5), frente al ancho completo de <strong>1,0 unidad</strong> en los niveles 2, 3 y 4.
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== SLIDE 18: CONCLUSIONES ==================== -->
+        <section class="slide" data-section="// 05. CONCLUSIONES Y LÍNEAS FUTURAS" data-title="Conclusiones y Trabajo Futuro">
+          <h2 class="slide-heading">
+            Conclusiones: tres hallazgos principales y agenda futura
+            <span class="sub-mono">[ APARTADO 4 · SÍNTESIS METODOLÓGICA ]</span>
+          </h2>
+
+          <div class="conclusions-grid">
+            <div class="conclusion-card">
+              <span class="c-num">HALLAZGO 01 · FUNCIÓN DE PÉRDIDA</span>
+              <h3>Regresión Ordinal (MSE) vs. Multiclase (Softmax)</h3>
+              <p>
+                Tratar el afecto nuclear como un continuo mediante MSE <strong>evitó la inversión polar</strong> (alcanzando <strong>98,40%</strong> y <strong>92,80%</strong> de exactitud tolerante) y capturó mejor los matices intermedios (niveles 2, 3 y 4).
+              </p>
+              <p style="border-top: var(--border-dashed); padding-top: 10px; font-size: 0.96rem; color: var(--fg-muted);">
+                <strong>Criterio de uso:</strong> Si solo interesa aislar polarización extrema (polos 1 y 5), <em>Multiclase</em> es competitivo; para modelar la totalidad del gradiente afectivo, la <em>Regresión Ordinal</em> es superior.
+              </p>
+            </div>
+
+            <div class="conclusion-card">
+              <span class="c-num">HALLAZGO 02 · DIMENSIONES DEL AFECTO</span>
+              <h3>Asimetría estructural entre dimensiones</h3>
+              <p>
+                <strong>Placer / Displacer</strong> ofrece marcadores léxicos explícitos (insultos, elogios, términos partidarios) que facilitan la discriminación vectorial.
+              </p>
+              <p>
+                <strong>Activación / Desactivación</strong> es sutil y contextual: un fuerte displacer puede articularse desde la <em>alta activación</em> (ira, indignación) o desde la <em>baja activación</em> (tristeza, resignación), volviendo crítica la elección de la arquitectura y la función de pérdida.
+              </p>
+            </div>
+
+            <div class="conclusion-card">
+              <span class="c-num">HALLAZGO 03 · DOMINIO LINGÜÍSTICO</span>
+              <h3>Preentrenamiento específico y adaptación local</h3>
+              <p>
+                <code>RoBERTuito Base</code> demostró un desempeño superior al interactuar con el registro coloquial de redes sociales en español frente a modelos multilingües generales.
+              </p>
+              <p>
+                A su vez, el <strong>reentrenamiento (<em>fine-tuning</em>)</strong> con una muestra anotada propia <strong>duplicó las métricas de rendimiento</strong>, superando las limitaciones de los modelos base ante la jerga política argentina.
+              </p>
+            </div>
+          </div>
+
+          <div class="future-bar">
+            <div class="future-bar-title">// LIMITACIONES Y LÍNEAS FUTURAS</div>
+            <div class="future-bar-content">
+              <strong>1. Arquitecturas ordinales:</strong> Contrastar esta formulación básica (neurona lineal + MSE) con arquitecturas específicas de la literatura de <em>ordinal learning</em>. &nbsp;|&nbsp;
+              <strong>2. Validación de anotación:</strong> Implementar protocolos de anotación múltiple cruzada y métricas formales de acuerdo inter-jueces (<em>Kappa de Cohen</em> / <em>Alpha de Krippendorff</em>).
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+      <!-- Barra inferior de navegación -->
+      <footer class="slide-bottombar">
+        <div class="nav-controls">
+          <button class="mono-btn" id="prevBtn" onclick="changeSlide(-1)">[ ← ANTERIOR ]</button>
+          <span class="slide-counter" id="slideCounter">01 / 10</span>
+          <button class="mono-btn" id="nextBtn" onclick="changeSlide(1)">[ SIGUIENTE → ]</button>
+        </div>
+
+        <div class="nav-controls">
+          <button class="mono-btn" onclick="toggleOverview()">[ G: ÍNDICE ]</button>
+          <button class="mono-btn" onclick="toggleFullscreen()">[ F: PANTALLA COMPLETA ]</button>
+        </div>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Lightbox para hacer zoom en gráficos -->
+  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <div class="lightbox-bar">
+      <span id="lightboxCaption" style="font-weight:700;"></span>
+      <button class="mono-btn" onclick="closeLightbox()">[ ESC / CERRAR ZOOM ]</button>
+    </div>
+    <img id="lightboxImg" src="" alt="Vista ampliada">
+  </div>
+
+  <!-- Índice rápido de diapositivas -->
+  <div class="overview-modal" id="overviewModal">
+    <div class="overview-header">
+      <h2>// ÍNDICE GENERAL DE DIAPOSITIVAS (01 A 18)</h2>
+      <button class="mono-btn" onclick="toggleOverview()">[ ESC / CERRAR ]</button>
+    </div>
+    <div class="overview-grid" id="overviewGrid"></div>
+  </div>
+
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const progressBar = document.getElementById('progressBar');
+    const sectionTag = document.getElementById('sectionTag');
+    const slideCounter = document.getElementById('slideCounter');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const deckStage = document.getElementById('deckStage');
+    const lightbox = document.getElementById('lightbox');
+    const lightboxImg = document.getElementById('lightboxImg');
+    const lightboxCaption = document.getElementById('lightboxCaption');
+    const overviewModal = document.getElementById('overviewModal');
+    const overviewGrid = document.getElementById('overviewGrid');
+
+    let currentIndex = 0;
+
+    function scaleStage() {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const scaleX = vw / 1600;
+      const scaleY = vh / 900;
+      const scale = Math.min(scaleX, scaleY);
+      deckStage.style.transform = `scale(${scale})`;
+    }
+
+    function updateSlide(index) {
+      if (index < 0 || index >= slides.length) return;
+      currentIndex = index;
+
+      slides.forEach((s, i) => {
+        s.classList.toggle('active', i === currentIndex);
+      });
+
+      const currentSlide = slides[currentIndex];
+      sectionTag.textContent = currentSlide.dataset.section || '// PRESENTACIÓN';
+
+      const num = String(currentIndex + 1).padStart(2, '0');
+      const total = String(slides.length).padStart(2, '0');
+      slideCounter.textContent = `${num} / ${total}`;
+
+      const pct = ((currentIndex + 1) / slides.length) * 100;
+      progressBar.style.width = `${pct}%`;
+
+      prevBtn.disabled = currentIndex === 0;
+      nextBtn.disabled = currentIndex === slides.length - 1;
+
+      renderOverview();
+    }
+
+    function changeSlide(delta) {
+      updateSlide(currentIndex + delta);
+    }
+
+    function openLightbox(src, caption) {
+      lightboxImg.src = src;
+      lightboxCaption.textContent = caption || '';
+      lightbox.classList.add('open');
+    }
+
+    function closeLightbox() {
+      lightbox.classList.remove('open');
+      lightboxImg.src = '';
+    }
+
+    function toggleOverview() {
+      overviewModal.classList.toggle('open');
+    }
+
+    function renderOverview() {
+      overviewGrid.innerHTML = '';
+      slides.forEach((s, idx) => {
+        const card = document.createElement('div');
+        card.className = 'overview-item' + (idx === currentIndex ? ' current' : '');
+        const num = String(idx + 1).padStart(2, '0');
+        card.innerHTML = `
+          <div class="ov-num">SLIDE ${num} · ${s.dataset.section || ''}</div>
+          <div class="ov-title">${s.dataset.title || 'Diapositiva ' + num}</div>
+        `;
+        card.onclick = () => {
+          updateSlide(idx);
+          overviewModal.classList.remove('open');
+        };
+        overviewGrid.appendChild(card);
+      });
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    window.addEventListener('resize', scaleStage);
+    window.addEventListener('keydown', (e) => {
+      if (lightbox.classList.contains('open')) {
+        if (e.key === 'Escape') closeLightbox();
+        return;
+      }
+      if (overviewModal.classList.contains('open')) {
+        if (e.key === 'Escape' || e.key.toLowerCase() === 'g') toggleOverview();
+        return;
+      }
+      if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        e.preventDefault();
+        changeSlide(1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        changeSlide(-1);
+      } else if (e.key === 'Home') {
+        updateSlide(0);
+      } else if (e.key === 'End') {
+        updateSlide(slides.length - 1);
+      } else if (e.key.toLowerCase() === 'f') {
+        toggleFullscreen();
+      } else if (e.key.toLowerCase() === 'g') {
+        toggleOverview();
+      }
+    });
+
+    scaleStage();
+    updateSlide(0);
+  </script>
+</body>
+</html>
