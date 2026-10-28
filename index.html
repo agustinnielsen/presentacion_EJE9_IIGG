@@ -200,6 +200,22 @@
       padding: 20px 0;
     }
 
+    .cover-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+    }
+
+    .cover-logo {
+      width: 118px;
+      height: 118px;
+      object-fit: contain;
+      border: var(--border-thin);
+      flex-shrink: 0;
+      background: #fff;
+    }
+
     .cover-kicker {
       font-family: var(--font-mono);
       font-size: 1.05rem;
@@ -1233,8 +1249,11 @@
         <!-- ==================== SLIDE 1: PORTADA ==================== -->
         <section class="slide active" data-section="// 01. PORTADA" data-title="Portada">
           <div class="cover-layout">
-            <div class="cover-kicker">
-              Jornadas de Jóvenes Investigadores · Instituto de Investigaciones Gino Germani
+            <div class="cover-header-row">
+              <div class="cover-kicker">
+                Jornadas de Jóvenes Investigadores · Instituto de Investigaciones Gino Germani
+              </div>
+              <img class="cover-logo" src="Presentacion_BERT_assets/images.jpg" alt="E-SIC · Equipo Sociedad, Internet y Cultura">
             </div>
 
             <h1 class="cover-title">
@@ -2145,13 +2164,42 @@
           </div>
         </section>
 
+        <!-- ==================== SLIDE 16: MUCHAS GRACIAS ==================== -->
+        <section class="slide" data-section="// 05. CIERRE" data-title="Muchas gracias">
+          <div class="cover-layout">
+            <div class="cover-header-row">
+              <div class="cover-kicker">
+                Jornadas de Jóvenes Investigadores · Instituto de Investigaciones Gino Germani
+              </div>
+              <img class="cover-logo" src="Presentacion_BERT_assets/images.jpg" alt="E-SIC · Equipo Sociedad, Internet y Cultura">
+            </div>
+
+            <div style="margin: auto 0;">
+              <h1 style="font-size: 4.8rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1;">
+                Muchas gracias
+              </h1>
+            </div>
+
+            <div class="cover-footer">
+              <div>
+                <div class="cover-author-name">Agustín Nielsen (IIGG-FSOC-UBA)</div>
+                <div class="cover-author-role">Estudiante avanzado Lic. en Sociología (FSOC-UBA)</div>
+              </div>
+              <div class="cover-meta-box">
+                <div>EJE 9 · TEORÍAS, EPISTEMOLOGÍAS Y METODOLOGÍAS</div>
+                <div style="margin-top:4px; color:var(--fg-muted);">PLN · ANÁLISIS DE SENTIMIENTO · REGRESIÓN ORDINAL</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </main>
 
       <!-- Barra inferior de navegación -->
       <footer class="slide-bottombar">
         <div class="nav-controls">
           <button class="mono-btn" id="prevBtn" onclick="changeSlide(-1)">[ ← ANTERIOR ]</button>
-          <span class="slide-counter" id="slideCounter">01 / 15</span>
+          <span class="slide-counter" id="slideCounter">01 / 16</span>
           <button class="mono-btn" id="nextBtn" onclick="changeSlide(1)">[ SIGUIENTE → ]</button>
         </div>
 
@@ -2176,7 +2224,7 @@
   <!-- Índice rápido de diapositivas -->
   <div class="overview-modal" id="overviewModal">
     <div class="overview-header">
-      <h2>// ÍNDICE GENERAL DE DIAPOSITIVAS (01 A 15)</h2>
+      <h2>// ÍNDICE GENERAL DE DIAPOSITIVAS (01 A 16)</h2>
       <button class="mono-btn" onclick="toggleOverview()">[ ESC / CERRAR ]</button>
     </div>
     <div class="overview-grid" id="overviewGrid"></div>

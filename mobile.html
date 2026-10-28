@@ -153,6 +153,22 @@
       padding: 12px 0;
     }
 
+    .cover-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .cover-logo {
+      width: 68px;
+      height: 68px;
+      object-fit: contain;
+      border: var(--border-thin);
+      flex-shrink: 0;
+      background: #fff;
+    }
+
     .cover-kicker {
       font-family: var(--font-mono);
       font-size: 0.82rem;
@@ -1077,8 +1093,11 @@
         <!-- ==================== SLIDE 1: PORTADA ==================== -->
         <section class="slide active" data-section="// 01. PORTADA" data-title="Portada">
           <div class="cover-layout">
-            <div class="cover-kicker">
-              Jornadas de Jóvenes Investigadores · Instituto de Investigaciones Gino Germani
+            <div class="cover-header-row">
+              <div class="cover-kicker">
+                Jornadas de Jóvenes Investigadores · Instituto de Investigaciones Gino Germani
+              </div>
+              <img class="cover-logo" src="Presentacion_BERT_assets/images.jpg" alt="E-SIC · Equipo Sociedad, Internet y Cultura">
             </div>
 
             <h1 class="cover-title">
@@ -1989,12 +2008,41 @@
           </div>
         </section>
 
+        <!-- ==================== SLIDE 16: MUCHAS GRACIAS ==================== -->
+        <section class="slide" data-section="// 05. CIERRE" data-title="Muchas gracias">
+          <div class="cover-layout">
+            <div class="cover-header-row">
+              <div class="cover-kicker">
+                Jornadas de Jóvenes Investigadores · Instituto de Investigaciones Gino Germani
+              </div>
+              <img class="cover-logo" src="Presentacion_BERT_assets/images.jpg" alt="E-SIC · Equipo Sociedad, Internet y Cultura">
+            </div>
+
+            <div style="margin: auto 0;">
+              <h1 style="font-size: 4.8rem; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1;">
+                Muchas gracias
+              </h1>
+            </div>
+
+            <div class="cover-footer">
+              <div>
+                <div class="cover-author-name">Agustín Nielsen (IIGG-FSOC-UBA)</div>
+                <div class="cover-author-role">Estudiante avanzado Lic. en Sociología (FSOC-UBA)</div>
+              </div>
+              <div class="cover-meta-box">
+                <div>EJE 9 · TEORÍAS, EPISTEMOLOGÍAS Y METODOLOGÍAS</div>
+                <div style="margin-top:4px; color:var(--fg-muted);">PLN · ANÁLISIS DE SENTIMIENTO · REGRESIÓN ORDINAL</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
       
   </main>
 
   <footer class="mobile-bottombar">
     <button class="touch-btn" id="prevBtn" onclick="changeSlide(-1)">[ ← ANT ]</button>
-    <span class="mobile-counter" id="slideCounter">01 / 15</span>
+    <span class="mobile-counter" id="slideCounter">01 / 16</span>
     <button class="touch-btn" id="nextBtn" onclick="changeSlide(1)">[ SIG → ]</button>
   </footer>
 
@@ -2010,7 +2058,7 @@
   <!-- Índice rápido -->
   <div class="overview-modal" id="overviewModal">
     <div class="overview-header">
-      <strong>// ÍNDICE (15 DIAPOSITIVAS)</strong>
+      <strong>// ÍNDICE (16 DIAPOSITIVAS)</strong>
       <button class="mode-btn" onclick="toggleOverview()">[ CERRAR ]</button>
     </div>
     <div class="overview-grid" id="overviewGrid"></div>
@@ -2079,7 +2127,7 @@
       scrollModeBtn.classList.toggle("active", isScroll);
       scrollModeBtn.textContent = isScroll ? "[ MODO SLIDES ]" : "[ MODO SCROLL ]";
       if (isScroll) {
-        sectionTag.textContent = "// LECTURA CONTINUA (15 SLIDES)";
+        sectionTag.textContent = "// LECTURA CONTINUA (16 SLIDES)";
         progressBar.style.width = "100%";
       } else {
         updateSlide(currentIndex);
